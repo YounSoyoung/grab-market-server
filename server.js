@@ -2,13 +2,36 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const models = require('./models'); //sequlize 사용을 가능하게 한다.
+const multer = require('multer');
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: function(req, file, cb){
+            cb(null, 'uploads/')
+        },
+        filename: function(req, file, cb){
+            cb(null, file.originalname);
+        }
+    })
+});
 const port = 8080;
 
 app.use(express.json());
 app.use(cors());
+app.use('/uploads', express.static('uploads'));
 
 app.get("/products", (req, res) => {
-    models.Product.findAll().then((result) => {
+    models.Product.findAll({
+        //limit: 1 //보여줄 상품의 개수를 정한다. 1개로 제한
+        order : [['createdAt', 'DESC']],
+        attributes : [ //불러올 정보를 제한
+            'id',
+            'name',
+            'price',
+            'createdAt',
+            'seller',
+            'imageUrl'
+        ]
+    }).then((result) => {
         console.log("PRODUCTS: ", result);
         res.send({
             products: result
@@ -44,10 +67,31 @@ app.post("/products", (req, res) => {
     
 });
 
-app.get("/products/:id/event/:eventId", (req, res) => {
+app.get("/products/:id", (req, res) => {
     const params = req.params;
-    const {id, eventId} = params;
-    res.send(`id는 ${id}와 ${eventId}입니다`);
+    const {id} = params;
+    models.Product.findOne({
+        where : {
+            id : id
+        }
+    }).then((result) => {
+        console.log("PRODUCT: ", result);
+        res.send({
+            product : result
+        })
+    }).catch((error) => {
+        console.error(error);
+        res.send("상품 조회에 에러가 발생했습니다.");
+    })
+});
+
+// upload.single() 이미지 파일을 하나 보냈을 때 처리, 파일을 보낼 때 키가 필요한데 () 안에 키값을 넣어준다
+app.post('/image', upload.single('image'), (req, res) => {
+    const file = req.file;
+    console.log(file);
+    res.send({
+        imageUrl : file.path
+    })
 })
 
 app.listen(port, () => {
